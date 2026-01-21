@@ -10,9 +10,12 @@ export class MoviesService {
   constructor(
     @Inject('SUPABASE_CLIENT')
     private readonly supabase: SupabaseClient,
-  ) { }
+  ) {}
 
-  private async getMovieStatus(movie_id: string, release_date: string): Promise<string> {
+  private async getMovieStatus(
+    movie_id: string,
+    release_date: string,
+  ): Promise<string> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const thirtyDaysFromNow = new Date(today);
@@ -53,38 +56,56 @@ export class MoviesService {
 
     if (error) throw error;
 
-    const results = await Promise.all((data || []).map(async (movie: any) => {
-      const status = await this.getMovieStatus(movie.movie_id, movie.release_date);
-      return {
-        ...movie,
-        status,
-      };
-    }));
+    const results = await Promise.all(
+      (data || []).map(async (movie: any) => {
+        const status = await this.getMovieStatus(
+          movie.movie_id,
+          movie.release_date,
+        );
+        return {
+          ...movie,
+          status,
+        };
+      }),
+    );
 
     return results;
   }
 
-  async findAllByCustomerId(user_id: string) {
-    const { data: movies, error } = await this.supabase.from('movies').select('*');
+  async findAllByCustomerId(customer_id?: string) {
+    const { data: movies, error } = await this.supabase
+      .from('movies')
+      .select('*');
 
     if (error) throw error;
 
-    const { data: saves, error: savesError } = await this.supabase
-      .from('saves')
-      .select('movie_id')
-      .eq('customer_id', user_id);
+    let savedMovieIds: Set<string> | null = null;
 
-    const savedMovieIds = new Set(saves?.map(save => save.movie_id) || []);
+    if (customer_id) {
+      const { data: saves } = await this.supabase
+        .from('saves')
+        .select('movie_id')
+        .eq('customer_id', customer_id);
 
-    const results = await Promise.all((movies || []).map(async (movie: any) => {
-      const status = await this.getMovieStatus(movie.movie_id, movie.release_date);
-      const isSaved = savedMovieIds.has(movie.movie_id);
-      return {
-        ...movie,
-        status,
-        isSaved,
-      };
-    }));
+      savedMovieIds = new Set(saves?.map((save) => save.movie_id) || []);
+    }
+
+    const results = await Promise.all(
+      (movies || []).map(async (movie: any) => {
+        const status = await this.getMovieStatus(
+          movie.movie_id,
+          movie.release_date,
+        );
+        const isSaved = savedMovieIds
+          ? savedMovieIds.has(movie.movie_id)
+          : null;
+        return {
+          ...movie,
+          status,
+          isSaved,
+        };
+      }),
+    );
 
     return results;
   }
