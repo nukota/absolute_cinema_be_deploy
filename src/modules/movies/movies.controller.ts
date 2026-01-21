@@ -27,7 +27,6 @@ export class MoviesController {
     return this.service.findAll();
   }
 
-  //
   @Get('/customer')
   @ApiQuery({ name: 'customer_id', required: false, type: String })
   findAllByCustomerId(@Query('customer_id') customer_id?: string) {
